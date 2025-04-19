@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -10,11 +8,13 @@ import {ETHHelper} from "../comm/ETHHelper.sol";
 import {TransferTokenHelper} from "../comm/TransferTokenHelper.sol";
 import {IMultiRewardFarm} from "../interfaces/IMultiRewardFarm.sol";
 import {IVault} from "../interfaces/IVault.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /***
 *   @title Celeron Multi-Rewards Farm
 */
-contract CeleronMultiRewardV2Farm is IMultiRewardFarm, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract CeleronMultiRewardV2Farm is IMultiRewardFarm, Ownable, ReentrancyGuard {
 
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -63,15 +63,17 @@ contract CeleronMultiRewardV2Farm is IMultiRewardFarm, OwnableUpgradeable, Reent
     /// @notice Emitted when set the WETH address
     event EventSetEthAddress(address indexed _wethAddr);
 
+    /// @notice Emitted when add new pool
+    event EventAddPool(address indexed _token, address _vault);
+
 
     receive() external payable {}
 
     /// @notice constructor the farm
     /// @param _ethAddress The ETH token address
-    constructor(address _ethAddress) {
-        __Ownable_init(msg.sender);
-        __ReentrancyGuard_init();
-
+    /// @notice constructor the farm
+    /// @param _ethAddress The ETH token address
+    constructor(address _ethAddress) Ownable(msg.sender){
         ethAddress = _ethAddress;
         totalAllocPoint = 0;
         wethHelper = new ETHHelper();
@@ -231,6 +233,9 @@ contract CeleronMultiRewardV2Farm is IMultiRewardFarm, OwnableUpgradeable, Reent
         bool _isEth,
         RewardInfo[] memory _rewards
     ) external onlyOwner {
+        require(_allocPoints > 0, "Farm: Invalid alloc points");
+        require(_token != address(0), "Farm: Invalid token address");
+        require(_vault != address(0), "Farm: Invalid value address");
         require(_withdrawFee <= 2, "Farm: Invalid withdraw fee");
 
         checkDuplicatePool(_token);
@@ -263,6 +268,8 @@ contract CeleronMultiRewardV2Farm is IMultiRewardFarm, OwnableUpgradeable, Reent
             newPool.acctPerShare[_rewards[i].token] = 0;
             rewardTokenSet.add(address(_rewards[i].token));
         }
+
+        emit EventAddPool(_token, _vault);
     }
 
     /// @notice Add new reward token to pool
